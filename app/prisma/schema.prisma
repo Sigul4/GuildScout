@@ -1,0 +1,158 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            BigInt          @id @map("user_id")
+  username      String         @db.VarChar(32)
+  geoLocation   String?        @map("geo_location") @db.VarChar(255)
+  firstSeenAt   DateTime       @map("first_seen_at")
+  lastActiveAt  DateTime       @map("last_active_at")
+  messageMatches MessageMatch[]
+  reactions     Reaction[]
+
+  @@map("users")
+}
+
+model Keyword {
+  id          BigInt         @id @default(autoincrement())
+  keyword     String        @unique @db.VarChar(255)
+  createdAt   DateTime      @map("created_at")
+  active      Boolean       @default(true)
+  guildId     BigInt        @map("guild_id")
+  matches     MessageMatch[]
+
+  @@map("keywords")
+}
+
+model MessageMatch {
+  id          BigInt     @id @default(autoincrement())
+  messageId   BigInt     @map("message_id")
+  channelId   BigInt     @map("channel_id")
+  guildId     BigInt     @map("guild_id")
+  authorId    BigInt     @map("author_id")
+  keywordId   BigInt     @map("keyword_id")
+  preContext  String?    @map("pre_context")
+  postContext String?    @map("post_context")
+  matchedAt   DateTime   @map("matched_at")
+  keyword     Keyword    @relation(fields: [keywordId], references: [id])
+  author      User       @relation(fields: [authorId], references: [id])
+
+  @@map("message_matches")
+}
+
+model Reaction {
+  id          BigInt     @id @default(autoincrement())
+  messageId   BigInt     @map("message_id")
+  guildId     BigInt     @map("guild_id")
+  channelId   BigInt     @map("channel_id")
+  userId      BigInt     @map("user_id")
+  emojiName   String     @map("emoji_name") @db.VarChar(255)
+  emojiId     BigInt?    @map("emoji_id")
+  addedAt     DateTime   @map("added_at")
+  removedAt   DateTime?  @map("removed_at")
+  user        User       @relation(fields: [userId], references: [id])
+
+  @@index([messageId])
+  @@index([userId])
+  @@map("reactions")
+}
+
+model Presence {
+  id        BigInt      @id @default(autoincrement())
+  userId    String      @map("user_id")
+  guildId   String      @map("guild_id")
+  timestamp DateTime    @map("timestamp")
+  status    String?     @map("status") // online, idle, dnd, offline
+  activities Activity[]
+
+  @@index([userId, guildId])
+  @@index([timestamp])
+  @@map("presences")
+}
+
+model Activity {
+  id            BigInt    @id @default(autoincrement())
+  presenceId    BigInt    @map("presence_id")
+  presence      Presence  @relation(fields: [presenceId], references: [id])
+  type          String    @map("type") // spotify, gaming, other
+  sessionStart  DateTime? @map("session_start")
+  sessionEnd    DateTime? @map("session_end")
+  duration      Int?      @map("duration") // in milliseconds
+  name          String?   @map("name")
+  state         String?   @map("state")
+  details       String?   @map("details")
+
+  spotifyActivity SpotifyActivity?
+  gamingActivity  GamingActivity?
+  otherActivity   OtherActivity?
+
+  @@index([type])
+  @@index([sessionStart, sessionEnd])
+  @@map("activities")
+}
+
+model SpotifyActivity {
+  id            BigInt   @id @default(autoincrement())
+  activityId    BigInt   @unique @map("activity_id")
+  activity      Activity @relation(fields: [activityId], references: [id])
+  songName      String   @map("song_name")
+  artist        String   @map("artist")
+  album         String?  @map("album")
+  trackId       String?  @map("track_id")
+  albumCoverUrl String?  @map("album_cover_url")
+  genres        String[] @default([])
+
+  @@map("spotify_activities")
+}
+
+model GamingActivity {
+  id            BigInt   @id @default(autoincrement())
+  activityId    BigInt   @unique @map("activity_id")
+  activity      Activity @relation(fields: [activityId], references: [id])
+  gameName      String   @map("game_name")
+  isCompetitive Boolean  @default(false) @map("is_competitive")
+  partySize     Int?     @map("party_size")
+  partyMaxSize  Int?     @map("party_max_size")
+  platformId    String?  @map("platform_id")
+
+  @@map("gaming_activities")
+}
+
+model OtherActivity {
+  id            BigInt   @id @default(autoincrement())
+  activityId    BigInt   @unique @map("activity_id")
+  activity      Activity @relation(fields: [activityId], references: [id])
+  activityType  Int      @map("activity_type")
+  url           String?  @map("url")
+  applicationId String?  @map("application_id")
+  emoji         String?  @map("emoji")
+
+  @@map("other_activities")
+}
+
+model SpotifyAuth {
+  id           BigInt   @id @default(autoincrement())
+  accessToken  String   @map("access_token")
+  refreshToken String   @map("refresh_token")
+  expiresIn    Int      @map("expires_in")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Artist {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @unique
+  spotifyId String?   @unique @map("spotify_id")
+  genres    String[]  @default([])
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("artists")
+}
